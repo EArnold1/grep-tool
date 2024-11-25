@@ -17,27 +17,17 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    let mut lines = Vec::new();
-
-    for line in contents.lines() {
-        if line.contains(query) {
-            lines.push(line);
-        }
-    }
-
-    lines
+    contents
+        .lines()
+        .filter(|line| line.contains(query))
+        .collect()
 }
 
 pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    let mut lines = Vec::new();
-
-    for line in contents.lines() {
-        if line.to_lowercase().contains(&query.to_lowercase()) {
-            lines.push(line);
-        }
-    }
-
-    lines
+    contents
+        .lines()
+        .filter(|line| line.to_lowercase().contains(&query.to_lowercase()))
+        .collect()
 }
 
 pub struct Config {
@@ -47,13 +37,17 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(args: &[String]) -> Result<Config, &str> {
-        if args.len() < 3 {
-            return Err("not enough arguments passed in");
-        }
+    pub fn new(mut args: env::Args) -> Result<Config, &'static str> {
+        args.next();
 
-        let query = args[1].clone();
-        let file_path = args[2].clone();
+        let query = match args.next() {
+            Some(q) => q,
+            None => return Err("Provide a query"),
+        };
+        let file_path = match args.next() {
+            Some(p) => p,
+            None => return Err("Provide a path"),
+        };
 
         let case_sensitive = env::var("CASE_SENSITIVE").is_err();
 
