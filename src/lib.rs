@@ -1,16 +1,20 @@
+use regex::{Captures, Regex};
 use std::{error::Error, fs};
+
+fn format_color<'a>(str: &'a str, pattern: &'a str) -> std::borrow::Cow<'a, str> {
+    use colored::Colorize;
+    let re = Regex::new(pattern).unwrap();
+
+    re.replace_all(str, |cap: &Captures| format!("{}", &cap[0].yellow()))
+}
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.file_path)?;
 
-    let results = if config.case_sensitive {
-        search(&config.query, &contents)
-    } else {
-        search_case_insensitive(&config.query, &contents)
-    };
+    let results = search(&config.query, &contents);
 
     for (line, content) in results {
-        println!("[{line}]: {content}")
+        println!("[{line}]: {}", format_color(content, &config.query))
     }
 
     Ok(())
@@ -20,7 +24,10 @@ pub fn search<'a>(query: &str, contents: &'a str) -> Vec<(usize, &'a str)> {
     contents
         .lines()
         .enumerate()
-        .filter(|(_, content)| content.contains(query))
+        .filter(|(_, content)| {
+            let q_regex = Regex::new(query).unwrap();
+            q_regex.is_match(content)
+        })
         .map(|(line, content)| (line + 1, content))
         .collect()
 }
@@ -37,22 +44,39 @@ pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<(usize
 pub struct Config {
     pub query: String,
     pub file_path: String,
-    pub case_sensitive: bool,
+    pub case_sensitive: Option<bool>,
 }
 
 impl Config {
     pub fn new(args: Config) -> Result<Config, String> {
         // validate search query (regex)
+        let mut pattern = args.query;
 
-        // validate file_path/dir
+        let case_sensitive = args.case_sensitive.unwrap_or(false);
 
-        let file_path = &args.file_path;
-
-        if fs::metadata(file_path).is_err() {
-            return Err(format!("invalid file path {}", file_path));
+        // Create regex
+        if Regex::new(&pattern).is_err() {
+            return Err("Invalid regex pattern".to_string());
         }
 
-        Ok(args)
+        let case_insensitive = r"(?i)";
+
+        if case_sensitive && !pattern.contains(case_insensitive) {
+            pattern = format!("{}{}", case_insensitive, pattern);
+        }
+
+        // validate file_path/dir
+        let file_path = args.file_path;
+
+        if fs::metadata(&file_path).is_err() {
+            return Err(format!("invalid file path {}", &file_path));
+        }
+
+        Ok(Config {
+            query: pattern,
+            file_path,
+            case_sensitive: None,
+        })
     }
 }
 
