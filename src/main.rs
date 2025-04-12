@@ -15,7 +15,7 @@ fn main() {
     let config = Config::new(Config {
         query: args.query,
         file_path: args.file_path,
-        case_sensitive: Some(args.case_sensitive),
+        case_insensitive: Some(args.case_insensitive),
     })
     .unwrap_or_else(|err| {
         eprintln!("{err}");

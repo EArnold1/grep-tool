@@ -32,19 +32,10 @@ pub fn search<'a>(query: &str, contents: &'a str) -> Vec<(usize, &'a str)> {
         .collect()
 }
 
-pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<(usize, &'a str)> {
-    contents
-        .lines()
-        .enumerate()
-        .filter(|(_, content)| content.to_lowercase().contains(&query.to_lowercase()))
-        .map(|(line, content)| (line + 1, content))
-        .collect()
-}
-
 pub struct Config {
     pub query: String,
     pub file_path: String,
-    pub case_sensitive: Option<bool>,
+    pub case_insensitive: Option<bool>,
 }
 
 impl Config {
@@ -52,17 +43,17 @@ impl Config {
         // validate search query (regex)
         let mut pattern = args.query;
 
-        let case_sensitive = args.case_sensitive.unwrap_or(false);
+        let case_insensitive = args.case_insensitive.unwrap_or(false);
 
         // Create regex
         if Regex::new(&pattern).is_err() {
             return Err("Invalid regex pattern".to_string());
         }
 
-        let case_insensitive = r"(?i)";
+        let case_insensitive_pattern = r"(?i)";
 
-        if case_sensitive && !pattern.contains(case_insensitive) {
-            pattern = format!("{}{}", case_insensitive, pattern);
+        if case_insensitive && !pattern.contains(case_insensitive_pattern) {
+            pattern = format!("{}{}", case_insensitive_pattern, pattern);
         }
 
         // validate file_path/dir
@@ -75,7 +66,7 @@ impl Config {
         Ok(Config {
             query: pattern,
             file_path,
-            case_sensitive: None,
+            case_insensitive: None,
         })
     }
 }
@@ -102,7 +93,7 @@ pick three.
 
     #[test]
     fn one_result() {
-        let query = "RusT";
+        let query = "(?i)RusT";
 
         let content = "\
     Rust:
@@ -110,12 +101,12 @@ pick three.
     pick three.
         ";
 
-        assert_eq!(vec![(1, "Rust:")], search_case_insensitive(query, content))
+        assert_eq!(vec![(1, "Rust:")], search(query, content))
     }
 
     #[test]
     fn case_insensitive() {
-        let query = "Arnold";
+        let query = "(?i)Arnold";
 
         let contents = "\
 Hello There,
@@ -126,7 +117,7 @@ My username is arnold.
 
         assert_eq!(
             vec![(2, "I am Arnold,"), (4, "My username is arnold.")],
-            search_case_insensitive(query, contents)
+            search(query, contents)
         )
     }
 }
