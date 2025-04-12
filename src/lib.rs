@@ -1,6 +1,4 @@
-use std::{env, error::Error, fs};
-
-const CASE_SENSITIVE: &str = "CASE_SENSITIVE";
+use std::{error::Error, fs};
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.file_path)?;
@@ -43,25 +41,18 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(mut args: env::Args) -> Result<Config, &'static str> {
-        args.next();
+    pub fn new(args: Config) -> Result<Config, String> {
+        // validate search query (regex)
 
-        let query = match args.next() {
-            Some(q) => q,
-            None => return Err("Provide a query"),
-        };
-        let file_path = match args.next() {
-            Some(p) => p,
-            None => return Err("Provide a path"),
-        };
+        // validate file_path/dir
 
-        let case_sensitive = env::var(CASE_SENSITIVE).is_err();
+        let file_path = &args.file_path;
 
-        Ok(Config {
-            query,
-            file_path,
-            case_sensitive,
-        })
+        if fs::metadata(file_path).is_err() {
+            return Err(format!("invalid file path {}", file_path));
+        }
+
+        Ok(args)
     }
 }
 

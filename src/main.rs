@@ -1,10 +1,24 @@
-use std::{env, process};
+mod utils;
+
+use std::process;
 
 use minigrep::Config;
 
+use utils::args::parse_args;
+
 fn main() {
-    let config = Config::new(env::args()).unwrap_or_else(|err| {
-        eprintln!("Problem parsing args: {}", err);
+    let args = parse_args().unwrap_or_else(|err| {
+        eprintln!("{err}");
+        process::exit(1)
+    });
+
+    let config = Config::new(Config {
+        query: args.query,
+        file_path: args.file_path,
+        case_sensitive: args.case_sensitive,
+    })
+    .unwrap_or_else(|err| {
+        eprintln!("{err}");
         process::exit(1)
     });
 
