@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+colored = "3.0.0"
+lexopt = "0.3.1"
+regex = "1.11.1"

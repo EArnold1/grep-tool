@@ -1,18 +1,20 @@
-use std::{env, error::Error, fs};
+use regex::{Captures, Regex};
+use std::{error::Error, fs};
 
-const CASE_SENSITIVE: &str = "CASE_SENSITIVE";
+fn format_color<'a>(str: &'a str, pattern: &'a str) -> std::borrow::Cow<'a, str> {
+    use colored::Colorize;
+    let re = Regex::new(pattern).unwrap();
+
+    re.replace_all(str, |cap: &Captures| format!("{}", &cap[0].yellow()))
+}
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.file_path)?;
 
-    let results = if config.case_sensitive {
-        search(&config.query, &contents)
-    } else {
-        search_case_insensitive(&config.query, &contents)
-    };
+    let results = search(&config.query, &contents);
 
     for (line, content) in results {
-        println!("[{line}]: {content}")
+        println!("[{line}]: {}", format_color(content, &config.query))
     }
 
     Ok(())
@@ -22,16 +24,10 @@ pub fn search<'a>(query: &str, contents: &'a str) -> Vec<(usize, &'a str)> {
     contents
         .lines()
         .enumerate()
-        .filter(|(_, content)| content.contains(query))
-        .map(|(line, content)| (line + 1, content))
-        .collect()
-}
-
-pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<(usize, &'a str)> {
-    contents
-        .lines()
-        .enumerate()
-        .filter(|(_, content)| content.to_lowercase().contains(&query.to_lowercase()))
+        .filter(|(_, content)| {
+            let q_regex = Regex::new(query).unwrap();
+            q_regex.is_match(content)
+        })
         .map(|(line, content)| (line + 1, content))
         .collect()
 }
@@ -39,28 +35,38 @@ pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<(usize
 pub struct Config {
     pub query: String,
     pub file_path: String,
-    pub case_sensitive: bool,
+    pub case_insensitive: Option<bool>,
 }
 
 impl Config {
-    pub fn new(mut args: env::Args) -> Result<Config, &'static str> {
-        args.next();
+    pub fn new(args: Config) -> Result<Config, String> {
+        // validate search query (regex)
+        let mut pattern = args.query;
 
-        let query = match args.next() {
-            Some(q) => q,
-            None => return Err("Provide a query"),
-        };
-        let file_path = match args.next() {
-            Some(p) => p,
-            None => return Err("Provide a path"),
-        };
+        let case_insensitive = args.case_insensitive.unwrap_or(false);
 
-        let case_sensitive = env::var(CASE_SENSITIVE).is_err();
+        // Create regex
+        if Regex::new(&pattern).is_err() {
+            return Err("Invalid regex pattern".to_string());
+        }
+
+        let case_insensitive_pattern = r"(?i)";
+
+        if case_insensitive && !pattern.contains(case_insensitive_pattern) {
+            pattern = format!("{}{}", case_insensitive_pattern, pattern);
+        }
+
+        // validate file_path/dir
+        let file_path = args.file_path;
+
+        if fs::metadata(&file_path).is_err() {
+            return Err(format!("invalid file path {}", &file_path));
+        }
 
         Ok(Config {
-            query,
+            query: pattern,
             file_path,
-            case_sensitive,
+            case_insensitive: None,
         })
     }
 }
@@ -87,7 +93,7 @@ pick three.
 
     #[test]
     fn one_result() {
-        let query = "RusT";
+        let query = "(?i)RusT";
 
         let content = "\
     Rust:
@@ -95,12 +101,12 @@ pick three.
     pick three.
         ";
 
-        assert_eq!(vec![(1, "Rust:")], search_case_insensitive(query, content))
+        assert_eq!(vec![(1, "Rust:")], search(query, content))
     }
 
     #[test]
     fn case_insensitive() {
-        let query = "Arnold";
+        let query = "(?i)Arnold";
 
         let contents = "\
 Hello There,
@@ -111,7 +117,7 @@ My username is arnold.
 
         assert_eq!(
             vec![(2, "I am Arnold,"), (4, "My username is arnold.")],
-            search_case_insensitive(query, contents)
+            search(query, contents)
         )
     }
 }
