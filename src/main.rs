@@ -12,17 +12,20 @@ fn main() {
         process::exit(1)
     });
 
-    let config = Config::new(Config {
-        query: args.query,
-        file_path: args.file_path,
-        case_insensitive: Some(args.case_insensitive),
-    })
-    .unwrap_or_else(|err| {
-        eprintln!("{err}");
-        process::exit(1)
-    });
+    let is_case_insensitive = args.case_insensitive;
 
-    println!("searching for {} in {}...", config.query, config.file_path);
+    let config = Config::new(args.query, args.file_path)
+        .unwrap_or_else(|err| {
+            eprintln!("{err}");
+            process::exit(1)
+        })
+        .case_insensitive(is_case_insensitive)
+        .build();
+
+    println!(
+        "searching for {} in {}...",
+        config.pattern, config.file_path
+    );
 
     if let Err(e) = minigrep::run(config) {
         eprintln!("Application Error: {}", e);
